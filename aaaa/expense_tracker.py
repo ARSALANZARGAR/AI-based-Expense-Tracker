@@ -2,6 +2,8 @@ import json
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox
+from sklearn.linear_model import LinearRegression
+import numpy as np
 
 class ExpenseTracker:
     def __init__(self, filename='expenses.json'):
@@ -56,6 +58,25 @@ class ExpenseTracker:
                 category_totals[category] = category_totals.get(category, 0) + expense['amount']
         return category_totals
 
+    def predict_expense(self):
+        if len(self.expenses) < 2:
+            return "Not enough data to make a prediction."
+
+        dates = [datetime.strptime(exp['date'], '%Y-%m-%d') for exp in self.expenses]
+        amounts = [exp['amount'] for exp in self.expenses]
+
+        # Convert dates to numerical values for regression
+        dates_num = np.array([(date - dates[0]).days for date in dates]).reshape(-1, 1)
+        amounts_num = np.array(amounts)
+
+        model = LinearRegression()
+        model.fit(dates_num, amounts_num)
+
+        future_date = (datetime.now() - dates[0]).days + 1
+        predicted_amount = model.predict([[future_date]])[0]
+
+        return f"Predicted expense for tomorrow: ${predicted_amount:.2f}"
+
 class ExpenseTrackerGUI:
     def __init__(self, root):
         self.tracker = ExpenseTracker()
@@ -63,6 +84,7 @@ class ExpenseTrackerGUI:
         self.root.title("Expense Tracker")
 
         self.create_widgets()
+        self.apply_styles()
 
     def create_widgets(self):
         self.tab_control = ttk.Notebook(self.root)
@@ -71,11 +93,13 @@ class ExpenseTrackerGUI:
         self.view_expense_tab = ttk.Frame(self.tab_control)
         self.total_expense_tab = ttk.Frame(self.tab_control)
         self.report_tab = ttk.Frame(self.tab_control)
+        self.ai_tab = ttk.Frame(self.tab_control)
 
         self.tab_control.add(self.add_expense_tab, text="Add Expense")
         self.tab_control.add(self.view_expense_tab, text="View Expenses")
         self.tab_control.add(self.total_expense_tab, text="Total Expenses")
         self.tab_control.add(self.report_tab, text="Generate Report")
+        self.tab_control.add(self.ai_tab, text="AI Predictions")
 
         self.tab_control.pack(expand=1, fill="both")
 
@@ -83,6 +107,7 @@ class ExpenseTrackerGUI:
         self.create_view_expense_tab()
         self.create_total_expense_tab()
         self.create_report_tab()
+        self.create_ai_tab()
 
     def create_add_expense_tab(self):
         ttk.Label(self.add_expense_tab, text="Description:").grid(row=0, column=0, padx=10, pady=10)
@@ -149,6 +174,13 @@ class ExpenseTrackerGUI:
         self.report_listbox = tk.Listbox(self.report_tab, width=50)
         self.report_listbox.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
 
+    def create_ai_tab(self):
+        self.ai_button = ttk.Button(self.ai_tab, text="Predict Next Expense", command=self.predict_expense)
+        self.ai_button.pack(padx=10, pady=10)
+
+        self.ai_label = ttk.Label(self.ai_tab, text="")
+        self.ai_label.pack(padx=10, pady=10)
+
     def add_expense(self):
         description = self.description_entry.get()
         amount = float(self.amount_entry.get())
@@ -179,9 +211,27 @@ class ExpenseTrackerGUI:
         for category, total in report.items():
             self.report_listbox.insert(tk.END, f"{category}: ${total:.2f}")
 
+    def predict_expense(self):
+        prediction = self.tracker.predict_expense()
+        self.ai_label.config(text=prediction)
+
     @staticmethod
     def parse_date(date_str):
         return datetime.strptime(date_str, '%Y-%m-%d') if date_str else None
+
+    def apply_styles(self):
+        style = ttk.Style(self.root)
+        style.theme_use('clam')
+        
+        style.configure('TNotebook', background='#6C3483')
+        style.configure('TNotebook.Tab', background='#A569BD', foreground='white', padding=(10, 10))
+        style.map('TNotebook.Tab', background=[('selected', '#5B2C6F')])
+
+        style.configure('TFrame', background='#D7BDE2')
+        style.configure('TLabel', background='#D7BDE2', foreground='#4A235A')
+        style.configure('TEntry', fieldbackground='#F2F3F4', background='#E8DAEF')
+        style.configure('TButton', background='#A569BD', foreground='white')
+        style.map('TButton', background=[('active', '#884EA0')])
 
 if __name__ == "__main__":
     root = tk.Tk()
